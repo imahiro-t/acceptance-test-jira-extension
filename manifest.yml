@@ -1,0 +1,60 @@
+modules:
+  jira:projectSettingsPage:
+    - key: acceptance-test-project-settings-page
+      resource: main-settings-page
+      title: Acceptance Test Configuration
+      resolver:
+        function: resolver
+  jira:issuePanel:
+    - key: acceptance-test-panel
+      resource: main-panel
+      resolver:
+        function: resolver
+      title: Acceptance Test
+      icon: https://imahiro-t.github.io/acceptance-test-jira-extension/acceptance-test.png
+  jira:entityProperty:
+    - key: "acceptance-test-search-property"
+      entityType: "issue"
+      propertyKey: acceptance_test_search
+      values:
+        - path: title
+          type: text
+          searchAlias: AcceptanceTestTitle
+        - path: todo
+          type: number
+          searchAlias: AcceptanceTestTodo
+        - path: passed
+          type: number
+          searchAlias: AcceptanceTestPassed
+        - path: failed
+          type: number
+          searchAlias: AcceptanceTestFailed
+        - path: skipped
+          type: number
+          searchAlias: AcceptanceTestSkipped
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main-panel
+    path: static/panel/build
+  - key: main-settings-page
+    path: static/settings/build
+permissions:
+  external:
+    fetch:
+      client:
+        - "*"
+      backend:
+        - "*"
+  content:
+    styles:
+      - unsafe-inline
+  scopes:
+    - manage:jira-project
+    - read:jira-work
+    - write:jira-work
+app:
+  runtime:
+    name: nodejs20.x
+  id: ari:cloud:ecosystem::app/5339b7c9-5ca7-4320-bed5-deed83705775
