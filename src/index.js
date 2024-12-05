@@ -328,7 +328,6 @@ const getGherkinTextFromBitBucket = async (projectId, issueKey) => {
 
 const getGherkinTextFromGitHub = async (projectId, issueKey) => {
   try {
-    const fileName = `${issueKey}.feature`;
     const { ownerForGitHub, repoForGitHub, accessTokenForGitHub } =
       await getProjectProperty(projectId);
     const owner = ownerForGitHub;
@@ -343,9 +342,10 @@ const getGherkinTextFromGitHub = async (projectId, issueKey) => {
         },
       }
     );
-    const path = (await fileListResponse.json()).tree.find((x) =>
-      x.path.includes(fileName)
-    ).path;
+    const path = (await fileListResponse.json()).tree.find((x) => {
+      const n = x.path.split("/").pop();
+      return n.includes(issueKey) && n.endsWith(".feature");
+    }).path;
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
       {
