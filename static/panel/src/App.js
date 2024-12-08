@@ -189,7 +189,7 @@ const View = ({ project, issue }) => {
       });
   };
 
-  const toggleChevron = () => (event) => {
+  const toggleChevron = () => (_event) => {
     setIsScenarioListOpen(!isScenarioListOpen);
   };
 
@@ -310,7 +310,7 @@ const Config = ({
     );
   };
 
-  const saveGherkinDocument = (event) => {
+  const saveGherkinDocument = (_event) => {
     setIsSaving(true);
     if (!editedGherkin || editedGherkin.length === 0) {
       invoke("clearIssueProperty", {
@@ -452,7 +452,7 @@ const Config = ({
                 spacing="compact"
                 onClick={getGherkinTextFromGitHub}
                 isTooltipDisabled={false}
-                label={`import '${issue.key}.feature' file from GitHub`}
+                label={`import '${issue.key}*.feature' file from GitHub`}
               ></IconButton>
             </Inline>
           </Inline>
@@ -492,8 +492,105 @@ const Config = ({
 
 const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
   const [openIndex, setOpenIndex] = useState(-1);
+  const [treeItems, setTreeItems] = useState([]);
+  const [scenarioMap, setScenarioMap] = useState({});
+  const [visibleIndices, setVisibleIndices] = useState([]);
+  const [isTreeView, setIsTreeView] = useState(false);
   const openStep = (index) => setOpenIndex(index);
   const closeStep = () => setOpenIndex(-1);
+
+  useEffect(() => {
+    initTreeItems();
+  }, []);
+
+  const ListIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="currentColor"
+          d="M5 6a1 1 0 1 0 0 2a1 1 0 0 0 0-2m3.5 0a1 1 0 0 0 0 2h10a1 1 0 1 0 0-2zm.1 5a1.1 1.1 0 0 0 0 2.2h9.8a1.1 1.1 0 0 0 0-2.2zm-1.1 6a1 1 0 0 1 1-1h10a1 1 0 1 1 0 2h-10a1 1 0 0 1-1-1M4 12a1 1 0 1 1 2 0a1 1 0 0 1-2 0m1 4a1 1 0 1 0 0 2a1 1 0 0 0 0-2"
+        />
+      </SVG>
+    );
+  };
+
+  const TreeIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="currentColor"
+          d="M7.5 8h14c.6 0 1-.4 1-1s-.4-1-1-1h-14c-.6 0-1 .4-1 1s.4 1 1 1m14 3h-10c-.6 0-1 .4-1 1s.4 1 1 1h10c.6 0 1-.4 1-1s-.4-1-1-1m0 5h-6c-.6 0-1 .4-1 1s.4 1 1 1h6c.6 0 1-.4 1-1s-.4-1-1-1M3.5 6c-.6 0-1 .4-1 1s.4 1 1 1s1-.4 1-1s-.4-1-1-1m4 5c-.6 0-1 .4-1 1s.4 1 1 1s1-.4 1-1s-.4-1-1-1m4 5c-.6 0-1 .4-1 1s.4 1 1 1s1-.4 1-1s-.4-1-1-1"
+        />
+      </SVG>
+    );
+  };
+
+  const initTreeItems = () => {
+    const treeItems = [
+      {
+        id: "root",
+        label: "",
+        children: [],
+      },
+    ];
+    const scenarioMap = {};
+    const createTreeItems = (givens, children, idPrefix, scenarioIndex) => {
+      const given = givens.shift();
+      if (given) {
+        if (!children.some((child) => child.label === given)) {
+          children.push({
+            id: idPrefix
+              ? `${idPrefix}_${children.length}`
+              : `${children.length}`,
+            label: given,
+            children: [],
+          });
+        }
+        const next = children.find((child) => child.label === given);
+        createTreeItems(givens, next.children, next.id, scenarioIndex);
+      } else {
+        const id = idPrefix ?? "root";
+        if (!scenarioMap[id]) {
+          scenarioMap[id] = [scenarioIndex];
+        } else {
+          scenarioMap[id].push(scenarioIndex);
+        }
+      }
+    };
+    getScenarioChildren(gherkinDocument).forEach((child, scenarioIndex) => {
+      let keywordType;
+      const givens =
+        child.scenario?.steps
+          ?.filter((step) => {
+            if (KEYWORD_TYPES.includes(step.keywordType)) {
+              keywordType = step.keywordType;
+            }
+            return keywordType === KEYWORD_TYPE.GIVEN;
+          })
+          ?.map((step) => getStepText(step)) ?? [];
+      createTreeItems(givens, treeItems[0].children, null, scenarioIndex);
+    });
+    setTreeItems(treeItems);
+    setScenarioMap(scenarioMap);
+  };
+
+  const onItemFocus = (_event, itemId) => {
+    setVisibleIndices(scenarioMap[itemId] ?? []);
+  };
+
+  const changeListView = () => {
+    setIsTreeView(false);
+    closeStep();
+    setVisibleIndices([]);
+  };
+
+  const changeTreeView = () => {
+    setIsTreeView(true);
+    closeStep();
+    setVisibleIndices([]);
+  };
 
   const handleFieldCheckbox = (id, childCount) => (event) => {
     const newStatus = structuredClone(status);
@@ -582,14 +679,181 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
     },
   };
 
+  const textAreaLabelStyles = (depth) => ({
+    ".MuiInputBase-root": {
+      fontSize: 10,
+      fontWeight: 600,
+      paddingTop: "4px",
+      paddingBottom: "4px",
+      paddingRight: "4px",
+      paddingLeft: `${12 * (depth - 1) + 4}px`,
+      ".MuiOutlinedInput-notchedOutline": {
+        border: "none",
+      },
+    },
+  });
+
   const description = gherkinDocument?.feature?.description;
   const background = gherkinDocument?.feature?.children?.find(
     (child) => !!child.background
   )?.background;
 
+  const createScenarioItem = (index, depth) => {
+    const child = getScenarioChildren(gherkinDocument)[index];
+    const id = `scenario_${index}`;
+    const scenarioStatus = status[id];
+    const label = child.scenario?.name ?? "";
+    const steps = child.scenario?.steps ?? [];
+    const checkboxStyles = {
+      ".MuiButtonBase-root": {
+        width: 24,
+        padding: 0,
+        margin: "0 4px 0 4px",
+      },
+      ".MuiSvgIcon-root": { width: 16 },
+      ".MuiFormControlLabel-label": { fontSize: 11 },
+    };
+    const selectStyles = {
+      minWidth: 80,
+      ".MuiInputBase-root": {
+        backgroundColor: backgroundColors[scenarioStatus],
+        color: fontColors[scenarioStatus],
+        fontWeight: "bold",
+        fontSize: 10,
+        maxHeight: 20,
+      },
+      ".MuiSelect-select": { padding: "2px 20px 2px 5.5px !important" },
+      ".MuiSvgIcon-root": { right: 1 },
+    };
+    const menuItemStyles = {
+      fontSize: 10,
+      maxHeight: 20,
+      minHeight: 20,
+      padding: "2px 20px 2px 5.5px !important",
+    };
+
+    return (
+      <>
+        <Box padding="space.050" xcss={xcss({ marginLeft: `${12 * depth}px` })}>
+          <Inline alignBlock="center" spread="space-between">
+            <Inline alignBlock="center">
+              <FormControlLabel
+                sx={checkboxStyles}
+                label={label}
+                disabled={scenarioStatus === FIELD_STATUS.SKIPPED}
+                control={
+                  <Checkbox
+                    checked={scenarioStatus === FIELD_STATUS.PASSED}
+                    onChange={handleFieldCheckbox(id, steps.length)}
+                  />
+                }
+              />
+            </Inline>
+            <Inline alignBlock="center" alignInline="end">
+              <FormControl sx={selectStyles} size="small">
+                <Select
+                  value={scenarioStatus}
+                  onChange={handleChange(id, steps.length)}
+                  MenuProps={{
+                    autoFocus: false,
+                    disableAutoFocusItem: true,
+                    disableEnforceFocus: true,
+                    disableAutoFocus: true,
+                  }}
+                >
+                  <MenuItem value={0} sx={menuItemStyles}>
+                    TODO
+                  </MenuItem>
+                  <MenuItem value={1} sx={menuItemStyles}>
+                    PASSED
+                  </MenuItem>
+                  <MenuItem value={2} sx={menuItemStyles}>
+                    FAILED
+                  </MenuItem>
+                  <MenuItem value={3} sx={menuItemStyles}>
+                    SKIPPED
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              <IconButton
+                icon={
+                  openIndex === index
+                    ? HipchatChevronDoubleUpIcon
+                    : HipchatChevronDoubleDownIcon
+                }
+                isDisabled={
+                  scenarioStatus === FIELD_STATUS.SKIPPED || steps.length === 0
+                }
+                appearance="subtle"
+                spacing="compact"
+                onClick={() =>
+                  openIndex === index ? closeStep(index) : openStep(index)
+                }
+              ></IconButton>
+            </Inline>
+          </Inline>
+        </Box>
+        {openIndex === index && (
+          <StepList
+            issue={issue}
+            index={index}
+            gherkinDocument={gherkinDocument}
+            status={status}
+            setStatus={setStatus}
+          />
+        )}
+      </>
+    );
+  };
+
+  const createScenarioItems = (node, depth) => {
+    const itemId = node.id;
+    const label = node.label ? (
+      <Stack>
+        <TextField
+          value={node.label}
+          multiline
+          fullWidth
+          sx={textAreaLabelStyles(depth)}
+        />
+      </Stack>
+    ) : (
+      <></>
+    );
+    const indices = scenarioMap[itemId] ?? [];
+    const items = indices.map((index) => createScenarioItem(index, depth));
+    const children =
+      node.children?.map((child) => createScenarioItems(child, depth + 1)) ??
+      [];
+    return [label].concat(items).concat(children);
+  };
+
   return (
     <>
       <Box padding="space.050">
+        <Inline alignBlock="center" spread="space-between">
+          <Inline alignBlock="center" alignInline="start"></Inline>
+          <Inline alignBlock="center" alignInline="end">
+            <IconButton
+              icon={(iconProps) => <ListIcon {...iconProps} size="small" />}
+              isDisabled={!isTreeView}
+              appearance="subtle"
+              spacing="compact"
+              onClick={changeListView}
+              isTooltipDisabled={false}
+              label={`change to list view`}
+            ></IconButton>
+            <IconButton
+              icon={(iconProps) => <TreeIcon {...iconProps} size="small" />}
+              isDisabled={isTreeView}
+              appearance="subtle"
+              spacing="compact"
+              onClick={changeTreeView}
+              isTooltipDisabled={false}
+              label={`change to tree view`}
+            ></IconButton>
+          </Inline>
+        </Inline>{" "}
         {description && (
           <Stack>
             <Text size="small" weight="bold">
@@ -618,113 +882,11 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
             ))}
           </Stack>
         )}
-        {getScenarioChildren(gherkinDocument).map((child, index) => {
-          const id = `scenario_${index}`;
-          const scenarioStatus = status[id];
-          const label = child.scenario?.name ?? "";
-          const steps = child.scenario?.steps ?? [];
-          const checkboxStyles = {
-            ".MuiButtonBase-root": {
-              width: 24,
-              padding: 0,
-              margin: "0 4px 0 4px",
-            },
-            ".MuiSvgIcon-root": { width: 16 },
-            ".MuiFormControlLabel-label": { fontSize: 11 },
-          };
-          const selectStyles = {
-            minWidth: 80,
-            ".MuiInputBase-root": {
-              backgroundColor: backgroundColors[scenarioStatus],
-              color: fontColors[scenarioStatus],
-              fontWeight: "bold",
-              fontSize: 10,
-              maxHeight: 20,
-            },
-            ".MuiSelect-select": { padding: "2px 20px 2px 5.5px !important" },
-            ".MuiSvgIcon-root": { right: 1 },
-          };
-          const menuItemStyles = {
-            fontSize: 10,
-            maxHeight: 20,
-            minHeight: 20,
-            padding: "2px 20px 2px 5.5px !important",
-          };
-
-          return (
-            <>
-              <Box padding="space.050">
-                <Inline alignBlock="center" spread="space-between">
-                  <Inline alignBlock="center">
-                    <FormControlLabel
-                      sx={checkboxStyles}
-                      label={label}
-                      disabled={scenarioStatus === FIELD_STATUS.SKIPPED}
-                      control={
-                        <Checkbox
-                          checked={scenarioStatus === FIELD_STATUS.PASSED}
-                          onChange={handleFieldCheckbox(id, steps.length)}
-                        />
-                      }
-                    />
-                  </Inline>
-                  <Inline alignBlock="center" alignInline="end">
-                    <FormControl sx={selectStyles} size="small">
-                      <Select
-                        value={scenarioStatus}
-                        onChange={handleChange(id, steps.length)}
-                        MenuProps={{
-                          autoFocus: false,
-                          disableAutoFocusItem: true,
-                          disableEnforceFocus: true,
-                          disableAutoFocus: true,
-                        }}
-                      >
-                        <MenuItem value={0} sx={menuItemStyles}>
-                          TODO
-                        </MenuItem>
-                        <MenuItem value={1} sx={menuItemStyles}>
-                          PASSED
-                        </MenuItem>
-                        <MenuItem value={2} sx={menuItemStyles}>
-                          FAILED
-                        </MenuItem>
-                        <MenuItem value={3} sx={menuItemStyles}>
-                          SKIPPED
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                    <IconButton
-                      icon={
-                        openIndex === index
-                          ? HipchatChevronDoubleUpIcon
-                          : HipchatChevronDoubleDownIcon
-                      }
-                      isDisabled={
-                        scenarioStatus === FIELD_STATUS.SKIPPED ||
-                        steps.length === 0
-                      }
-                      appearance="subtle"
-                      spacing="compact"
-                      onClick={() =>
-                        openIndex === index ? closeStep(index) : openStep(index)
-                      }
-                    ></IconButton>
-                  </Inline>
-                </Inline>
-              </Box>
-              {openIndex === index && (
-                <StepList
-                  issue={issue}
-                  index={index}
-                  gherkinDocument={gherkinDocument}
-                  status={status}
-                  setStatus={setStatus}
-                />
-              )}
-            </>
-          );
-        })}{" "}
+        {isTreeView && createScenarioItems(treeItems[0], 0)}
+        {!isTreeView &&
+          getScenarioChildren(gherkinDocument).map((_child, index) =>
+            createScenarioItem(index)
+          )}{" "}
       </Box>
     </>
   );
