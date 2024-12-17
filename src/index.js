@@ -344,7 +344,11 @@ const getGherkinTextFromGitHub = async (projectId, issueKey) => {
     );
     const path = (await fileListResponse.json()).tree.find((x) => {
       const n = x.path.split("/").pop();
-      return n.includes(issueKey) && n.endsWith(".feature");
+      return (
+        n.includes(issueKey) &&
+        n.endsWith(".feature") &&
+        isNaN(n.at(n.indexOf(issueKey) + issueKey.length))
+      );
     }).path;
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
