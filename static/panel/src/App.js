@@ -120,19 +120,23 @@ const sumUpStatus = (gherkinDocument, status) => {
   );
   const todo =
     scenarios.filter(
-      (_scenario, index) => status[`scenario_${index}`] === FIELD_STATUS.TODO
+      (_scenario, scenarioIndex) =>
+        status[`scenario_${scenarioIndex}`] === FIELD_STATUS.TODO
     ).length ?? 0;
   const passed =
     scenarios.filter(
-      (_scenario, index) => status[`scenario_${index}`] === FIELD_STATUS.PASSED
+      (_scenario, scenarioIndex) =>
+        status[`scenario_${scenarioIndex}`] === FIELD_STATUS.PASSED
     ).length ?? 0;
   const failed =
     scenarios.filter(
-      (_scenario, index) => status[`scenario_${index}`] === FIELD_STATUS.FAILED
+      (_scenario, scenarioIndex) =>
+        status[`scenario_${scenarioIndex}`] === FIELD_STATUS.FAILED
     ).length ?? 0;
   const skipped =
     scenarios.filter(
-      (_scenario, index) => status[`scenario_${index}`] === FIELD_STATUS.SKIPPED
+      (_scenario, scenarioIndex) =>
+        status[`scenario_${scenarioIndex}`] === FIELD_STATUS.SKIPPED
     ).length ?? 0;
   return { todo, passed, failed, skipped };
 };
@@ -155,14 +159,23 @@ const color = (gherkinDocument, status) => {
 
 const View = ({ project, issue }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [gherkin, setGherkin] = useState();
-  const [gherkinDocument, setGherkinDocument] = useState();
-  const [status, setStatus] = useState();
+  const [gherkins, setGherkins] = useState();
+  const [gherkinDocuments, setGherkinDocuments] = useState();
+  const [statuses, setStatuses] = useState();
   const [gitAvailable, setGitAvailable] = useState({});
   const [isConfigurationOpen, setIsConfigurationOpen] = useState(false);
-  const [isScenarioListOpen, setIsScenarioListOpen] = useState(false);
+  const [isScenarioListOpen, setIsScenarioListOpen] = useState([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
+  const [lastTestIndex, setLastTestIndex] = useState(0);
   const openConfiguration = () => setIsConfigurationOpen(true);
   const closeConfiguration = () => setIsConfigurationOpen(false);
+  const closeAllScenarioList = () =>
+    setIsScenarioListOpen([false, false, false, false, false]);
 
   useEffect(() => {
     resetIssueProperty();
@@ -188,74 +201,116 @@ const View = ({ project, issue }) => {
       issueId: issue.id,
     })
       .then((data) => {
-        const { gherkin, status, bitBucketAvailable, gitHubAvailable } = data;
-        setIsScenarioListOpen(false);
-        setGherkin(gherkin);
-        setGherkinDocument(convertToGherkinDocument(gherkin));
+        const { gherkins, statuses, bitBucketAvailable, gitHubAvailable } =
+          data;
+        closeAllScenarioList();
+        setGherkins(gherkins);
+        const gherkinDocuments = gherkins.map((gherkin) =>
+          convertToGherkinDocument(gherkin)
+        );
+        setGherkinDocuments(gherkinDocuments);
         setGitAvailable({ bitBucketAvailable, gitHubAvailable });
-        setStatus(status);
-        setIsLoading(false);
+        setStatuses(statuses);
+        gherkinDocuments.forEach((gherkinDocument, testIndex) => {
+          const status = statuses[testIndex];
+          if (gherkinDocument && status) {
+            setLastTestIndex(testIndex);
+          }
+        });
       })
       .finally(() => {
         setIsLoading(false);
       });
   };
 
-  const toggleChevron = () => (_event) => {
-    setIsScenarioListOpen(!isScenarioListOpen);
+  const setStatus = (testIndex, status, newStatus) => {
+    const statusesTemp = structuredClone(statuses);
+    statusesTemp[testIndex] = newStatus;
+    setStatuses(statusesTemp);
+    invoke("updateIssueProperty", {
+      statuses: statusesTemp,
+      issueId: issue.id,
+    }).then((data) => {
+      if (data !== true) {
+        statusesTemp[testIndex] = status;
+        setStatuses(statusesTemp);
+      }
+    });
+  };
+
+  const toggleChevron = (testIndex) => (_event) => {
+    const isScenarioListOpenTemp = structuredClone(isScenarioListOpen);
+    isScenarioListOpenTemp[testIndex] = !isScenarioListOpen[testIndex];
+    setIsScenarioListOpen(isScenarioListOpenTemp);
   };
 
   return !isLoading ? (
     <>
-      {gherkinDocument && status && (
-        <Box
-          padding="space.050"
-          backgroundColor={color(gherkinDocument, status)}
-        >
-          <Inline alignBlock="center" spread="space-between">
-            <Box>
-              <Inline space="space.050" alignBlock="center" shouldWrap>
-                <Text size="small" as="strong">
-                  {gherkinDocument.feature?.name}
-                </Text>
-              </Inline>
-              <Inline space="space.050" alignBlock="center" shouldWrap>
-                <Lozenge appearance="success" isBold>
-                  {"PASSED: " +
-                    (sumUpStatus(gherkinDocument, status).passed || 0)}
-                </Lozenge>
-                <Lozenge appearance="removed" isBold>
-                  {"FAILED: " +
-                    (sumUpStatus(gherkinDocument, status).failed || 0)}
-                </Lozenge>
-                <Lozenge appearance="default" isBold>
-                  {"SKIPPED: " +
-                    (sumUpStatus(gherkinDocument, status).skipped || 0)}
-                </Lozenge>
-                <Lozenge appearance="default">
-                  {"TODO: " + (sumUpStatus(gherkinDocument, status).todo || 0)}
-                </Lozenge>
-              </Inline>
-            </Box>
-            <Inline alignBlock="center" alignInline="end">
-              <IconButton
-                icon={isScenarioListOpen ? ChevronUpIcon : ChevronDownIcon}
-                appearance="subtle"
-                spacing="compact"
-                onClick={toggleChevron()}
-              ></IconButton>
-            </Inline>
-          </Inline>
-        </Box>
-      )}
-      {isScenarioListOpen && (
-        <ScenarioList
-          issue={issue}
-          gherkinDocument={gherkinDocument}
-          status={status}
-          setStatus={setStatus}
-        />
-      )}
+      {gherkinDocuments.map((gherkinDocument, testIndex) => {
+        const status = statuses[testIndex];
+        return (
+          <>
+            {gherkinDocument && status && (
+              <>
+                {testIndex !== 0 && <Box padding="space.100"></Box>}
+                <Box
+                  padding="space.050"
+                  backgroundColor={color(gherkinDocument, status)}
+                >
+                  <Inline alignBlock="center" spread="space-between">
+                    <Box>
+                      <Inline space="space.050" alignBlock="center" shouldWrap>
+                        <Text size="small" as="strong">
+                          {gherkinDocument.feature?.name}
+                        </Text>
+                      </Inline>
+                      <Inline space="space.050" alignBlock="center" shouldWrap>
+                        <Lozenge appearance="success" isBold>
+                          {"PASSED: " +
+                            (sumUpStatus(gherkinDocument, status).passed || 0)}
+                        </Lozenge>
+                        <Lozenge appearance="removed" isBold>
+                          {"FAILED: " +
+                            (sumUpStatus(gherkinDocument, status).failed || 0)}
+                        </Lozenge>
+                        <Lozenge appearance="default" isBold>
+                          {"SKIPPED: " +
+                            (sumUpStatus(gherkinDocument, status).skipped || 0)}
+                        </Lozenge>
+                        <Lozenge appearance="default">
+                          {"TODO: " +
+                            (sumUpStatus(gherkinDocument, status).todo || 0)}
+                        </Lozenge>
+                      </Inline>
+                    </Box>
+                    <Inline alignBlock="center" alignInline="end">
+                      <IconButton
+                        icon={
+                          isScenarioListOpen[testIndex]
+                            ? ChevronUpIcon
+                            : ChevronDownIcon
+                        }
+                        appearance="subtle"
+                        spacing="compact"
+                        onClick={toggleChevron(testIndex)}
+                      ></IconButton>
+                    </Inline>
+                  </Inline>
+                </Box>
+              </>
+            )}
+            {isScenarioListOpen[testIndex] && (
+              <ScenarioList
+                testIndex={testIndex}
+                gherkinDocument={gherkinDocument}
+                status={status}
+                setStatus={setStatus}
+                isLastTest={testIndex === lastTestIndex}
+              />
+            )}
+          </>
+        );
+      })}
       {!isConfigurationOpen && (
         <Box padding="space.050">
           <Inline alignBlock="center" alignInline="end">
@@ -272,7 +327,8 @@ const View = ({ project, issue }) => {
         <Config
           project={project}
           issue={issue}
-          gherkin={gherkin}
+          gherkins={gherkins}
+          statuses={statuses}
           gitAvailable={gitAvailable}
           resetIssueProperty={resetIssueProperty}
           closeConfiguration={closeConfiguration}
@@ -287,16 +343,108 @@ const View = ({ project, issue }) => {
 const Config = ({
   project,
   issue,
-  gherkin,
+  gherkins,
+  statuses,
   gitAvailable,
   resetIssueProperty,
   closeConfiguration,
 }) => {
-  const [editedGherkin, setEditedGherkin] = useState(gherkin);
-  const [isGherkinInvalid, setIsGherkinInvalid] = useState();
+  const initialGherkins = structuredClone(gherkins);
+  const [testIndex, setTestIndex] = useState(0);
+  const [editedGherkins, setEditedGherkins] = useState(gherkins);
+  const [isGherkinInvalidList, setIsGherkinInvalidList] = useState([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
   const [isSaving, setIsSaving] = useState(false);
   const [isBitBucketLoading, setIsBitBucketLoading] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const isGherkinInvalid = () => {
+    return isGherkinInvalidList.some((isGherkinInvalid) => isGherkinInvalid);
+  };
+
+  const OneIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M11 8h1v8"
+        />
+      </SVG>
+    );
+  };
+
+  const TwoIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 8h3a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h3"
+        />
+      </SVG>
+    );
+  };
+
+  const ThreeIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 8h2.5A1.5 1.5 0 0 1 14 9.5v1a1.5 1.5 0 0 1-1.5 1.5H11h1.5a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5H10"
+        />
+      </SVG>
+    );
+  };
+
+  const FourIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 8v3a1 1 0 0 0 1 1h3m0-4v8"
+        />
+      </SVG>
+    );
+  };
+
+  const FiveIcon = (props) => {
+    const { size } = props;
+    return (
+      <SVG size={size}>
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-3V8h4"
+        />
+      </SVG>
+    );
+  };
 
   const BitBucketIcon = (props) => {
     const { size } = props;
@@ -322,56 +470,83 @@ const Config = ({
     );
   };
 
+  const showTextGherkin = (testIndex) => {
+    setTestIndex(testIndex);
+  };
+
+  const isEdited = () => {
+    return editedGherkins.some(
+      (gherkin, index) => (gherkin ?? "") !== (initialGherkins[index] ?? "")
+    );
+  };
+
   const saveGherkinDocument = (_event) => {
-    setIsSaving(true);
-    if (!editedGherkin || editedGherkin.length === 0) {
-      invoke("clearIssueProperty", {
-        issueId: issue.id,
-      })
-        .then((data) => {
-          if (data) {
-            resetIssueProperty();
-            closeConfiguration();
-          }
+    const cleared = editedGherkins.every((gherkin) => gherkin.length === 0);
+    const edited = isEdited();
+    if (edited) {
+      setIsSaving(true);
+      if (cleared) {
+        invoke("clearIssueProperty", {
+          issueId: issue.id,
         })
-        .finally(() => {
-          setIsSaving(false);
+          .then((data) => {
+            if (data) {
+              resetIssueProperty();
+              closeConfiguration();
+            }
+          })
+          .finally(() => {
+            setIsSaving(false);
+          });
+      } else {
+        const newStatuses = structuredClone(statuses);
+        editedGherkins.forEach((gherkinText, index) => {
+          if ((gherkinText ?? "").length === 0) {
+            newStatuses[index] = {};
+            return;
+          }
+          if (gherkinText === initialGherkins[index]) {
+            return;
+          }
+          const gherkinDocument = convertToGherkinDocument(gherkinText);
+          if (!gherkinDocument) {
+            return;
+          }
+          const status = {
+            title: gherkinDocument.feature?.name ?? "",
+          };
+          let keywordType;
+          getScenarioChildren(gherkinDocument).forEach(
+            (child, scenarioIndex) => {
+              status[`scenario_${scenarioIndex}`] = FIELD_STATUS.TODO;
+              child.scenario?.steps?.forEach((step, stepIndex) => {
+                if (KEYWORD_TYPES.includes(step.keywordType)) {
+                  keywordType = step.keywordType;
+                }
+                if (keywordType === KEYWORD_TYPE.THEN) {
+                  status[`scenario_${scenarioIndex}_${stepIndex}`] =
+                    FIELD_STATUS.TODO;
+                }
+              });
+            }
+          );
+          newStatuses[index] = status;
         });
-    } else {
-      const gherkinDocument = convertToGherkinDocument(editedGherkin);
-      if (!gherkinDocument) {
-        setIsSaving(false);
-        return;
+        invoke("initIssueProperty", {
+          gherkins: editedGherkins,
+          statuses: newStatuses,
+          issueId: issue.id,
+        })
+          .then((data) => {
+            if (data) {
+              resetIssueProperty();
+              closeConfiguration();
+            }
+          })
+          .finally(() => {
+            setIsSaving(false);
+          });
       }
-      const status = {
-        title: gherkinDocument.feature?.name ?? "",
-      };
-      let keywordType;
-      getScenarioChildren(gherkinDocument).forEach((child, index) => {
-        status[`scenario_${index}`] = FIELD_STATUS.TODO;
-        child.scenario?.steps?.forEach((step, stepIndex) => {
-          if (KEYWORD_TYPES.includes(step.keywordType)) {
-            keywordType = step.keywordType;
-          }
-          if (keywordType === KEYWORD_TYPE.THEN) {
-            status[`scenario_${index}_${stepIndex}`] = FIELD_STATUS.TODO;
-          }
-        });
-      });
-      invoke("initIssueProperty", {
-        gherkin: editedGherkin,
-        status: status,
-        issueId: issue.id,
-      })
-        .then((data) => {
-          if (data) {
-            resetIssueProperty();
-            closeConfiguration();
-          }
-        })
-        .finally(() => {
-          setIsSaving(false);
-        });
     }
   };
 
@@ -383,7 +558,9 @@ const Config = ({
     })
       .then((data) => {
         if (data?.value) {
-          setEditedGherkin(data.value);
+          const gherkinTextTemp = structuredClone(editedGherkins);
+          gherkinTextTemp[testIndex] = data.value;
+          setEditedGherkins(gherkinTextTemp);
         }
       })
       .finally(() => {
@@ -399,7 +576,9 @@ const Config = ({
     })
       .then((data) => {
         if (data?.value) {
-          setEditedGherkin(data.value);
+          const gherkinTextTemp = structuredClone(editedGherkins);
+          gherkinTextTemp[testIndex] = data.value;
+          setEditedGherkins(gherkinTextTemp);
         }
       })
       .finally(() => {
@@ -409,13 +588,17 @@ const Config = ({
 
   const changeGherkin = (event) => {
     const gherkinText = event.target.value;
-    setEditedGherkin(gherkinText);
+    const gherkinTextTemp = structuredClone(editedGherkins);
+    gherkinTextTemp[testIndex] = gherkinText;
+    setEditedGherkins(gherkinTextTemp);
+    const isGherkinInvalidListTemp = structuredClone(isGherkinInvalidList);
     if (!gherkinText || gherkinText.length === 0) {
-      setIsGherkinInvalid(false);
+      isGherkinInvalidListTemp[testIndex] = false;
     } else {
       const gherkinDocument = convertToGherkinDocument(gherkinText);
-      setIsGherkinInvalid(!gherkinDocument);
+      isGherkinInvalidListTemp[testIndex] = !gherkinDocument;
     }
+    setIsGherkinInvalidList(isGherkinInvalidListTemp);
   };
 
   const textAreaStyles = {
@@ -469,17 +652,105 @@ const Config = ({
             </Inline>
           </Inline>
         </Box>
-        <Box padding="space.050" xcss={isGherkinInvalid && jsonErrorBoxStyles}>
+        <Box padding="space.050">
+          <Inline alignBlock="center" alignInline="start">
+            <IconButton
+              icon={(iconProps) => <OneIcon {...iconProps} size="small" />}
+              isDisabled={testIndex === 0}
+              appearance="subtle"
+              spacing="compact"
+              onClick={() => showTextGherkin(0)}
+            ></IconButton>
+            <IconButton
+              icon={(iconProps) => <TwoIcon {...iconProps} size="small" />}
+              isDisabled={testIndex === 1}
+              appearance="subtle"
+              spacing="compact"
+              onClick={() => showTextGherkin(1)}
+            ></IconButton>
+            <IconButton
+              icon={(iconProps) => <ThreeIcon {...iconProps} size="small" />}
+              isDisabled={testIndex === 2}
+              appearance="subtle"
+              spacing="compact"
+              onClick={() => showTextGherkin(2)}
+            ></IconButton>
+            <IconButton
+              icon={(iconProps) => <FourIcon {...iconProps} size="small" />}
+              isDisabled={testIndex === 3}
+              appearance="subtle"
+              spacing="compact"
+              onClick={() => showTextGherkin(3)}
+            ></IconButton>
+            <IconButton
+              icon={(iconProps) => <FiveIcon {...iconProps} size="small" />}
+              isDisabled={testIndex === 4}
+              appearance="subtle"
+              spacing="compact"
+              onClick={() => showTextGherkin(4)}
+            ></IconButton>
+          </Inline>
+        </Box>
+        <Box
+          padding="space.025"
+          xcss={isGherkinInvalid() && jsonErrorBoxStyles}
+        >
           <Stack>
-            <TextField
-              value={editedGherkin}
-              onChange={changeGherkin}
-              multiline
-              maxRows={20}
-              minRows={10}
-              fullWidth
-              sx={textAreaStyles}
-            />
+            {testIndex === 0 && (
+              <TextField
+                value={editedGherkins[testIndex]}
+                onChange={changeGherkin}
+                multiline
+                maxRows={20}
+                minRows={10}
+                fullWidth
+                sx={textAreaStyles}
+              />
+            )}
+            {testIndex === 1 && (
+              <TextField
+                value={editedGherkins[testIndex]}
+                onChange={changeGherkin}
+                multiline
+                maxRows={20}
+                minRows={10}
+                fullWidth
+                sx={textAreaStyles}
+              />
+            )}
+            {testIndex === 2 && (
+              <TextField
+                value={editedGherkins[testIndex]}
+                onChange={changeGherkin}
+                multiline
+                maxRows={20}
+                minRows={10}
+                fullWidth
+                sx={textAreaStyles}
+              />
+            )}
+            {testIndex === 3 && (
+              <TextField
+                value={editedGherkins[testIndex]}
+                onChange={changeGherkin}
+                multiline
+                maxRows={20}
+                minRows={10}
+                fullWidth
+                sx={textAreaStyles}
+              />
+            )}
+            {testIndex === 4 && (
+              <TextField
+                value={editedGherkins[testIndex]}
+                onChange={changeGherkin}
+                multiline
+                maxRows={20}
+                minRows={10}
+                fullWidth
+                sx={textAreaStyles}
+              />
+            )}
           </Stack>
         </Box>
         <Box padding="space.050">
@@ -488,7 +759,7 @@ const Config = ({
               onClick={saveGherkinDocument}
               appearance="primary"
               isLoading={isSaving}
-              isDisabled={isGherkinInvalid}
+              isDisabled={!isEdited() || isGherkinInvalid()}
             >
               Save
             </Button>
@@ -502,17 +773,24 @@ const Config = ({
   );
 };
 
-const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
+const ScenarioList = ({
+  testIndex,
+  gherkinDocument,
+  status,
+  setStatus,
+  isLastTest,
+}) => {
   const [openIndex, setOpenIndex] = useState(-1);
   const [treeItems, setTreeItems] = useState([]);
   const [scenarioMap, setScenarioMap] = useState({});
-  const [visibleIndices, setVisibleIndices] = useState([]);
   const [isTreeView, setIsTreeView] = useState(false);
-  const openStep = (index) => setOpenIndex(index);
+  const [scenarioCount, setScenarioCount] = useState(0);
+  const openStep = (scenarioIndex) => setOpenIndex(scenarioIndex);
   const closeStep = () => setOpenIndex(-1);
 
   useEffect(() => {
     initTreeItems();
+    setScenarioCount(getScenarioChildren(gherkinDocument)?.length ?? 0);
   }, []);
 
   const ListIcon = (props) => {
@@ -588,20 +866,14 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
     setScenarioMap(scenarioMap);
   };
 
-  const onItemFocus = (_event, itemId) => {
-    setVisibleIndices(scenarioMap[itemId] ?? []);
-  };
-
   const changeListView = () => {
     setIsTreeView(false);
     closeStep();
-    setVisibleIndices([]);
   };
 
   const changeTreeView = () => {
     setIsTreeView(true);
     closeStep();
-    setVisibleIndices([]);
   };
 
   const handleFieldCheckbox = (id, childCount) => (event) => {
@@ -623,15 +895,7 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
         }
       }
     }
-    setStatus(newStatus);
-    invoke("updateIssueProperty", {
-      status: newStatus,
-      issueId: issue.id,
-    }).then((data) => {
-      if (data !== true) {
-        setStatus(status);
-      }
-    });
+    setStatus(testIndex, status, newStatus);
   };
 
   const handleChange = (id, childCount) => (event) => {
@@ -658,15 +922,7 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
     if (event.target.value === FIELD_STATUS.SKIPPED) {
       closeStep();
     }
-    setStatus(newStatus);
-    invoke("updateIssueProperty", {
-      status: newStatus,
-      issueId: issue.id,
-    }).then((data) => {
-      if (data !== true) {
-        setStatus(status);
-      }
-    });
+    setStatus(testIndex, status, newStatus);
   };
 
   const backgroundColors = [
@@ -710,9 +966,9 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
     (child) => !!child.background
   )?.background;
 
-  const createScenarioItem = (index, depth) => {
-    const child = getScenarioChildren(gherkinDocument)[index];
-    const id = `scenario_${index}`;
+  const createScenarioItem = (scenarioIndex, depth) => {
+    const child = getScenarioChildren(gherkinDocument)[scenarioIndex];
+    const id = `scenario_${scenarioIndex}`;
     const scenarioStatus = status[id];
     const label = child.scenario?.name ?? "";
     const steps = child.scenario?.steps ?? [];
@@ -789,7 +1045,7 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
               </FormControl>
               <IconButton
                 icon={
-                  openIndex === index
+                  openIndex === scenarioIndex
                     ? HipchatChevronDoubleUpIcon
                     : HipchatChevronDoubleDownIcon
                 }
@@ -799,20 +1055,28 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
                 appearance="subtle"
                 spacing="compact"
                 onClick={() =>
-                  openIndex === index ? closeStep(index) : openStep(index)
+                  openIndex === scenarioIndex
+                    ? closeStep(scenarioIndex)
+                    : openStep(scenarioIndex)
                 }
               ></IconButton>
             </Inline>
           </Inline>
         </Box>
-        {openIndex === index && (
+        {openIndex === scenarioIndex && (
           <StepList
-            issue={issue}
-            index={index}
+            testIndex={testIndex}
+            scenarioIndex={scenarioIndex}
             gherkinDocument={gherkinDocument}
             status={status}
             setStatus={setStatus}
           />
+        )}
+        {isLastTest && scenarioCount === 1 && scenarioIndex === 0 && (
+          <Box padding="space.400"></Box>
+        )}
+        {isLastTest && scenarioCount === 2 && scenarioIndex === 1 && (
+          <Box padding="space.200"></Box>
         )}
       </>
     );
@@ -833,7 +1097,9 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
       <></>
     );
     const indices = scenarioMap[itemId] ?? [];
-    const items = indices.map((index) => createScenarioItem(index, depth));
+    const items = indices.map((scenarioIndex) =>
+      createScenarioItem(scenarioIndex, depth)
+    );
     const children =
       node.children?.map((child) => createScenarioItems(child, depth + 1)) ??
       [];
@@ -896,15 +1162,21 @@ const ScenarioList = ({ issue, gherkinDocument, status, setStatus }) => {
         )}
         {isTreeView && createScenarioItems(treeItems[0], 0)}
         {!isTreeView &&
-          getScenarioChildren(gherkinDocument).map((_child, index) =>
-            createScenarioItem(index)
+          getScenarioChildren(gherkinDocument).map((_child, scenarioIndex) =>
+            createScenarioItem(scenarioIndex)
           )}{" "}
       </Box>
     </>
   );
 };
 
-const StepList = ({ issue, index, gherkinDocument, status, setStatus }) => {
+const StepList = ({
+  testIndex,
+  scenarioIndex,
+  gherkinDocument,
+  status,
+  setStatus,
+}) => {
   const handleChange = (id, parentId, childCount) => (event) => {
     const newStatus = structuredClone(status);
     newStatus[id] = event.target.value;
@@ -926,15 +1198,7 @@ const StepList = ({ issue, index, gherkinDocument, status, setStatus }) => {
         newStatus[parentId] = FIELD_STATUS.PASSED;
       }
     }
-    setStatus(newStatus);
-    invoke("updateIssueProperty", {
-      status: newStatus,
-      issueId: issue.id,
-    }).then((data) => {
-      if (data !== true) {
-        setStatus(status);
-      }
-    });
+    setStatus(testIndex, status, newStatus);
   };
 
   const backgroundColors = [
@@ -965,9 +1229,10 @@ const StepList = ({ issue, index, gherkinDocument, status, setStatus }) => {
   };
 
   const steps =
-    getScenarioChildren(gherkinDocument)[index]?.scenario?.steps ?? [];
+    getScenarioChildren(gherkinDocument)[scenarioIndex]?.scenario?.steps ?? [];
   const examples =
-    getScenarioChildren(gherkinDocument)[index]?.scenario?.examples ?? [];
+    getScenarioChildren(gherkinDocument)[scenarioIndex]?.scenario?.examples ??
+    [];
 
   let keywordType;
 
@@ -985,8 +1250,8 @@ const StepList = ({ issue, index, gherkinDocument, status, setStatus }) => {
           if (KEYWORD_TYPES.includes(step.keywordType)) {
             keywordType = step.keywordType;
           }
-          const id = `scenario_${index}_${stepIndex}`;
-          const parentId = `scenario_${index}`;
+          const id = `scenario_${scenarioIndex}_${stepIndex}`;
+          const parentId = `scenario_${scenarioIndex}`;
           const stepStatus = status[id];
           const text = getStepText(step);
           const selectStyles = {

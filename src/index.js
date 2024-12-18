@@ -69,26 +69,28 @@ const setProjectProperty = async (
   return true;
 };
 
-const sumUpStatus = (status) => {
+const sumUpStatuses = (statuses) => {
   const sum = {
     todo: 0,
     passed: 0,
     failed: 0,
     skipped: 0,
   };
-  let index = 0;
-  while (status[`scenario_${index}`] !== undefined) {
-    if (status[`scenario_${index}`] === FIELD_STATUS.TODO) {
-      sum.todo++;
-    } else if (status[`scenario_${index}`] === FIELD_STATUS.PASSED) {
-      sum.passed++;
-    } else if (status[`scenario_${index}`] === FIELD_STATUS.FAILED) {
-      sum.failed++;
-    } else if (status[`scenario_${index}`] === FIELD_STATUS.SKIPPED) {
-      sum.skipped++;
+  statuses.forEach((status) => {
+    let index = 0;
+    while (status[`scenario_${index}`] !== undefined) {
+      if (status[`scenario_${index}`] === FIELD_STATUS.TODO) {
+        sum.todo++;
+      } else if (status[`scenario_${index}`] === FIELD_STATUS.PASSED) {
+        sum.passed++;
+      } else if (status[`scenario_${index}`] === FIELD_STATUS.FAILED) {
+        sum.failed++;
+      } else if (status[`scenario_${index}`] === FIELD_STATUS.SKIPPED) {
+        sum.skipped++;
+      }
+      index++;
     }
-    index++;
-  }
+  });
   return sum;
 };
 
@@ -106,7 +108,7 @@ const getIssueProperty = async (projectId, issueId) => {
         },
       }
     );
-  const gherkin =
+  const gherkins =
     gherkinResponse.status === 200
       ? (await gherkinResponse.json())["value"]
       : undefined;
@@ -137,19 +139,19 @@ const getIssueProperty = async (projectId, issueId) => {
     gitHubAvailable = ownerForGitHub && repoForGitHub && accessTokenForGitHub;
   } catch (e) {}
 
-  const status =
+  const statuses =
     statusResponse.status === 200
       ? (await statusResponse.json())["value"]
       : undefined;
   return {
-    gherkin: gherkin,
-    status: status ?? {},
+    gherkins: gherkins ? (Array.isArray(gherkins) ? gherkins : [gherkins]) : [],
+    statuses: statuses ? (Array.isArray(statuses) ? statuses : [statuses]) : [],
     bitBucketAvailable: bitBucketAvailable,
     gitHubAvailable: gitHubAvailable,
   };
 };
 
-const initIssueProperty = async (gherkin, status, issueId) => {
+const initIssueProperty = async (gherkins, statuses, issueId) => {
   const response = await api
     .asUser()
     .requestJira(
@@ -160,7 +162,7 @@ const initIssueProperty = async (gherkin, status, issueId) => {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(gherkin),
+        body: JSON.stringify(gherkins),
       }
     );
   if (response.status !== 200 && response.status !== 201) {
@@ -177,13 +179,13 @@ const initIssueProperty = async (gherkin, status, issueId) => {
             Accept: "application/json",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(status),
+          body: JSON.stringify(statuses),
         }
       );
   } catch (e) {}
   try {
-    const entity = sumUpStatus(status);
-    entity["title"] = status.title ?? "";
+    const entity = sumUpStatuses(statuses);
+    entity["title"] = statuses.map((status) => status.title ?? "").join(" | ");
     await api
       .asUser()
       .requestJira(
@@ -201,7 +203,7 @@ const initIssueProperty = async (gherkin, status, issueId) => {
   return true;
 };
 
-const updateIssueProperty = async (status, issueId) => {
+const updateIssueProperty = async (statuses, issueId) => {
   try {
     await api
       .asUser()
@@ -213,13 +215,13 @@ const updateIssueProperty = async (status, issueId) => {
             Accept: "application/json",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(status),
+          body: JSON.stringify(statuses),
         }
       );
   } catch (e) {}
   try {
-    const entity = sumUpStatus(status);
-    entity["title"] = status.title ?? "";
+    const entity = sumUpStatuses(statuses);
+    entity["title"] = statuses.map((status) => status.title ?? "").join(" | ");
     await api
       .asUser()
       .requestJira(
@@ -404,13 +406,13 @@ resolver.define("getIssueProperty", async (req) => {
 });
 
 resolver.define("initIssueProperty", async (req) => {
-  const { gherkin, status, issueId } = req.payload;
-  return await initIssueProperty(gherkin, status, issueId);
+  const { gherkins, statuses, issueId } = req.payload;
+  return await initIssueProperty(gherkins, statuses, issueId);
 });
 
 resolver.define("updateIssueProperty", async (req) => {
-  const { status, issueId } = req.payload;
-  return await updateIssueProperty(status, issueId);
+  const { statuses, issueId } = req.payload;
+  return await updateIssueProperty(statuses, issueId);
 });
 
 resolver.define("clearIssueProperty", async (req) => {

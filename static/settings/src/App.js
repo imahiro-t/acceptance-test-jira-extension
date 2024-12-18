@@ -248,7 +248,7 @@ const View = ({ project }) => {
           />
         </Stack>
         <Stack>
-          <Text size="small">Access Token</Text>
+          <Text size="small">Access Token (PAT)</Text>
           <TextField
             type={"password"}
             value={accessTokenForGitHub}
