@@ -6,7 +6,7 @@
   "private": true,
   "devDependencies": {
     "eslint": "^8.56.0",
-    "eslint-plugin-react-hooks": "^4.6.0"
+    "eslint-plugin-react-hooks": "^5.1.0"
   },
   "dependencies": {
     "@forge/bridge": "3.5.0",
