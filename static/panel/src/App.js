@@ -652,49 +652,49 @@ const Config = ({
             </Inline>
           </Inline>
         </Box>
-        <Box padding="space.050">
-          <Inline alignBlock="center" alignInline="start">
-            <IconButton
-              icon={(iconProps) => <OneIcon {...iconProps} size="small" />}
-              isDisabled={testIndex === 0}
-              appearance="subtle"
-              spacing="compact"
-              onClick={() => showTextGherkin(0)}
-            ></IconButton>
-            <IconButton
-              icon={(iconProps) => <TwoIcon {...iconProps} size="small" />}
-              isDisabled={testIndex === 1}
-              appearance="subtle"
-              spacing="compact"
-              onClick={() => showTextGherkin(1)}
-            ></IconButton>
-            <IconButton
-              icon={(iconProps) => <ThreeIcon {...iconProps} size="small" />}
-              isDisabled={testIndex === 2}
-              appearance="subtle"
-              spacing="compact"
-              onClick={() => showTextGherkin(2)}
-            ></IconButton>
-            <IconButton
-              icon={(iconProps) => <FourIcon {...iconProps} size="small" />}
-              isDisabled={testIndex === 3}
-              appearance="subtle"
-              spacing="compact"
-              onClick={() => showTextGherkin(3)}
-            ></IconButton>
-            <IconButton
-              icon={(iconProps) => <FiveIcon {...iconProps} size="small" />}
-              isDisabled={testIndex === 4}
-              appearance="subtle"
-              spacing="compact"
-              onClick={() => showTextGherkin(4)}
-            ></IconButton>
-          </Inline>
-        </Box>
         <Box
           padding="space.025"
           xcss={isGherkinInvalid() && jsonErrorBoxStyles}
         >
+          <Stack>
+            <Inline alignBlock="center" alignInline="start">
+              <IconButton
+                icon={(iconProps) => <OneIcon {...iconProps} size="small" />}
+                isDisabled={testIndex === 0}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => showTextGherkin(0)}
+              ></IconButton>
+              <IconButton
+                icon={(iconProps) => <TwoIcon {...iconProps} size="small" />}
+                isDisabled={testIndex === 1}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => showTextGherkin(1)}
+              ></IconButton>
+              <IconButton
+                icon={(iconProps) => <ThreeIcon {...iconProps} size="small" />}
+                isDisabled={testIndex === 2}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => showTextGherkin(2)}
+              ></IconButton>
+              <IconButton
+                icon={(iconProps) => <FourIcon {...iconProps} size="small" />}
+                isDisabled={testIndex === 3}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => showTextGherkin(3)}
+              ></IconButton>
+              <IconButton
+                icon={(iconProps) => <FiveIcon {...iconProps} size="small" />}
+                isDisabled={testIndex === 4}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => showTextGherkin(4)}
+              ></IconButton>
+            </Inline>
+          </Stack>
           <Stack>
             {testIndex === 0 && (
               <TextField
