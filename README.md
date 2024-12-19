@@ -8,6 +8,12 @@ Issue panel for Acceptance Test Management.
 
 ## Release Notes
 
+### 0.0.2
+
+- ✨ Add multiple test case registration functionality
+- ✨ Add tree view functionality to scenario list display
+- ✨ adopt partial match for GitHub
+
 ### 0.0.1
 
 - 🎉 Initial release
