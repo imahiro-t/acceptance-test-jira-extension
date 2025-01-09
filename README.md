@@ -8,6 +8,10 @@ Issue panel for Acceptance Test Management.
 
 ## Release Notes
 
+### 0.0.3
+
+- 🐛 fix not to send access token to client
+
 ### 0.0.2
 
 - ✨ Add multiple test case registration functionality
