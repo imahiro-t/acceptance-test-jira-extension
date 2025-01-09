@@ -42,13 +42,24 @@ const setProjectProperty = async (
   accessTokenForGitHub,
   projectId
 ) => {
+  const projectProperty = await getProjectProperty(projectId);
   const body = {
     workspaceForBitBucket: workspaceForBitBucket ?? "",
     repoForBitBucket: repoForBitBucket ?? "",
-    accessTokenForBitBucket: accessTokenForBitBucket ?? "",
+    accessTokenForBitBucket:
+      workspaceForBitBucket &&
+      repoForBitBucket &&
+      (accessTokenForBitBucket ?? "").length === 0
+        ? projectProperty["accessTokenForBitBucket"] ?? ""
+        : accessTokenForBitBucket ?? "",
     ownerForGitHub: ownerForGitHub ?? "",
     repoForGitHub: repoForGitHub ?? "",
-    accessTokenForGitHub: accessTokenForGitHub ?? "",
+    accessTokenForGitHub:
+      ownerForGitHub &&
+      repoForGitHub &&
+      (accessTokenForGitHub ?? "").length === 0
+        ? projectProperty["accessTokenForGitHub"] ?? ""
+        : accessTokenForGitHub ?? "",
   };
   const response = await api
     .asUser()
@@ -376,7 +387,10 @@ const resolver = new Resolver();
 
 resolver.define("getProjectProperty", async (req) => {
   const { projectId } = req.payload;
-  return await getProjectProperty(projectId);
+  const projectProperty = await getProjectProperty(projectId);
+  projectProperty["accessTokenForBitBucket"] = "";
+  projectProperty["accessTokenForGitHub"] = "";
+  return projectProperty;
 });
 
 resolver.define("setProjectProperty", async (req) => {
