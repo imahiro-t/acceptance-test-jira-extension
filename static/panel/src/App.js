@@ -1112,9 +1112,13 @@ const ScenarioList = ({
             </Inline>
           </Inline>
           {openNoteIndex !== scenarioIndex && (
-            <Text size="small" as="em">
-              {sliceTextByMarkdownLink(note).map((text) => text)}
-            </Text>
+            <Stack>
+              {note.split("\n").map((line) => (
+                <Text size="small" as="em">
+                  {sliceTextByMarkdownLink(line)}
+                </Text>
+              ))}
+            </Stack>
           )}
           {openNoteIndex === scenarioIndex && (
             <NoteEditor
