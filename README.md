@@ -8,6 +8,10 @@ Issue panel for Acceptance Test Management.
 
 ## Release Notes
 
+### 0.0.4
+
+- ✨ Add ability to add note to individual acceptance test scenarios
+
 ### 0.0.3
 
 - 🐛 fix not to send access token to client
