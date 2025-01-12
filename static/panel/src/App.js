@@ -7,10 +7,14 @@ import Lozenge from "@atlaskit/lozenge";
 import SVG from "@atlaskit/icon/svg";
 import ChevronDownIcon from "@atlaskit/icon/glyph/chevron-down";
 import ChevronUpIcon from "@atlaskit/icon/glyph/chevron-up";
+import ShortcutIcon from "@atlaskit/icon/glyph/shortcut";
+import EditorNoteIcon from "@atlaskit/icon/glyph/editor/note";
+import EditorDoneIcon from "@atlaskit/icon/glyph/editor/done";
+import EditorCloseIcon from "@atlaskit/icon/glyph/editor/close";
 import HipchatChevronDoubleDownIcon from "@atlaskit/icon/glyph/hipchat/chevron-double-down";
 import HipchatChevronDoubleUpIcon from "@atlaskit/icon/glyph/hipchat/chevron-double-up";
 import { useThemeObserver, token } from "@atlaskit/tokens";
-import { invoke, view } from "@forge/bridge";
+import { invoke, view, router } from "@forge/bridge";
 
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import Select from "@mui/material/Select";
@@ -781,12 +785,15 @@ const ScenarioList = ({
   isLastTest,
 }) => {
   const [openIndex, setOpenIndex] = useState(-1);
+  const [openNoteIndex, setOpenNoteIndex] = useState(-1);
   const [treeItems, setTreeItems] = useState([]);
   const [scenarioMap, setScenarioMap] = useState({});
   const [isTreeView, setIsTreeView] = useState(false);
   const [scenarioCount, setScenarioCount] = useState(0);
   const openStep = (scenarioIndex) => setOpenIndex(scenarioIndex);
   const closeStep = () => setOpenIndex(-1);
+  const openNote = (scenarioIndex) => setOpenNoteIndex(scenarioIndex);
+  const closeNote = () => setOpenNoteIndex(-1);
 
   useEffect(() => {
     initTreeItems();
@@ -815,6 +822,38 @@ const ScenarioList = ({
         />
       </SVG>
     );
+  };
+
+  const Link = ({ children, href }) => {
+    const handleNavigate = () => {
+      router.open(href);
+    };
+
+    return (
+      <a style={{ cursor: "pointer" }} onClick={handleNavigate}>
+        {children} <ShortcutIcon size="small" label="" />
+      </a>
+    );
+  };
+
+  const sliceTextByMarkdownLink = (text) => {
+    const markdownUrlRegex = /\[([^\]]+)\]\((https?:\/\/[^\s]+)\)/g;
+    let result = [];
+    let lastIndex = 0;
+    text.replace(markdownUrlRegex, (match, p1, p2, index) => {
+      result.push(text.slice(lastIndex, index));
+      result.push(
+        <>
+          {" "}
+          <Link href={p2} target="_blank">
+            {p1}
+          </Link>{" "}
+        </>
+      );
+      lastIndex = index + match.length;
+    });
+    result.push(text.slice(lastIndex));
+    return result;
   };
 
   const initTreeItems = () => {
@@ -869,11 +908,13 @@ const ScenarioList = ({
   const changeListView = () => {
     setIsTreeView(false);
     closeStep();
+    closeNote();
   };
 
   const changeTreeView = () => {
     setIsTreeView(true);
     closeStep();
+    closeNote();
   };
 
   const handleFieldCheckbox = (id, childCount) => (event) => {
@@ -971,6 +1012,7 @@ const ScenarioList = ({
     const id = `scenario_${scenarioIndex}`;
     const scenarioStatus = status[id];
     const label = child.scenario?.name ?? "";
+    const note = status[`scenario_note_${scenarioIndex}`] ?? "";
     const steps = child.scenario?.steps ?? [];
     const checkboxStyles = {
       ".MuiButtonBase-root": {
@@ -1044,6 +1086,13 @@ const ScenarioList = ({
                 </Select>
               </FormControl>
               <IconButton
+                icon={EditorNoteIcon}
+                isDisabled={openNoteIndex === scenarioIndex}
+                appearance="subtle"
+                spacing="compact"
+                onClick={() => openNote(scenarioIndex)}
+              ></IconButton>
+              <IconButton
                 icon={
                   openIndex === scenarioIndex
                     ? HipchatChevronDoubleUpIcon
@@ -1062,6 +1111,20 @@ const ScenarioList = ({
               ></IconButton>
             </Inline>
           </Inline>
+          {openNoteIndex !== scenarioIndex && (
+            <Text size="small" as="em">
+              {sliceTextByMarkdownLink(note).map((text) => text)}
+            </Text>
+          )}
+          {openNoteIndex === scenarioIndex && (
+            <NoteEditor
+              testIndex={testIndex}
+              scenarioIndex={scenarioIndex}
+              status={status}
+              setStatus={setStatus}
+              closeNote={closeNote}
+            />
+          )}
         </Box>
         {openIndex === scenarioIndex && (
           <StepList
@@ -1166,6 +1229,62 @@ const ScenarioList = ({
             createScenarioItem(scenarioIndex)
           )}{" "}
       </Box>
+    </>
+  );
+};
+
+const NoteEditor = ({
+  testIndex,
+  scenarioIndex,
+  status,
+  setStatus,
+  closeNote,
+}) => {
+  const id = `scenario_note_${scenarioIndex}`;
+  const [note, setNote] = useState(status[id] ?? "");
+
+  const handleNoteChange = (data) => {
+    setNote(data.target.value);
+  };
+
+  const saveNote = () => {
+    const newStatus = structuredClone(status);
+    newStatus[id] = note;
+    setStatus(testIndex, status, newStatus);
+    closeNote();
+  };
+
+  const textFieldStyles = {
+    ".MuiInputBase-root": {
+      fontSize: 11,
+      fontWeight: 100,
+      padding: "4px",
+    },
+  };
+
+  return (
+    <>
+      <Inline>
+        <TextField
+          value={note}
+          onChange={handleNoteChange}
+          multiline
+          fullWidth
+          sx={textFieldStyles}
+        />
+        <IconButton
+          icon={EditorDoneIcon}
+          appearance="subtle"
+          spacing="compact"
+          onClick={saveNote}
+        ></IconButton>
+        <IconButton
+          icon={EditorCloseIcon}
+          appearance="subtle"
+          spacing="compact"
+          onClick={closeNote}
+        ></IconButton>
+      </Inline>
     </>
   );
 };
