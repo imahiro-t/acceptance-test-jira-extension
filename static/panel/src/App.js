@@ -356,6 +356,8 @@ const Config = ({
   const initialGherkins = structuredClone(gherkins);
   const [testIndex, setTestIndex] = useState(0);
   const [editedGherkins, setEditedGherkins] = useState(gherkins);
+  const [paths, setPaths] = useState();
+  const [path, setPath] = useState();
   const [isGherkinInvalidList, setIsGherkinInvalidList] = useState([
     false,
     false,
@@ -485,7 +487,9 @@ const Config = ({
   };
 
   const saveGherkinDocument = (_event) => {
-    const cleared = editedGherkins.every((gherkin) => gherkin.length === 0);
+    const cleared = editedGherkins.every(
+      (gherkin) => !gherkin || gherkin.length === 0
+    );
     const edited = isEdited();
     if (edited) {
       setIsSaving(true);
@@ -566,6 +570,7 @@ const Config = ({
           gherkinTextTemp[testIndex] = data.value;
           setEditedGherkins(gherkinTextTemp);
         }
+        setPaths(undefined);
       })
       .finally(() => {
         setIsBitBucketLoading(false);
@@ -584,10 +589,35 @@ const Config = ({
           gherkinTextTemp[testIndex] = data.value;
           setEditedGherkins(gherkinTextTemp);
         }
+        if (data?.paths) {
+          setPaths(data.paths);
+        }
       })
       .finally(() => {
         setIsGitHubLoading(false);
       });
+  };
+
+  const getGherkinTextFromGitHubByPath = () => {
+    setIsGitHubLoading(true);
+    invoke("getGherkinTextFromGitHubByPath", {
+      projectId: project.id,
+      path: path,
+    })
+      .then((data) => {
+        if (data?.value) {
+          const gherkinTextTemp = structuredClone(editedGherkins);
+          gherkinTextTemp[testIndex] = data.value;
+          setEditedGherkins(gherkinTextTemp);
+        }
+      })
+      .finally(() => {
+        setIsGitHubLoading(false);
+      });
+  };
+
+  const handlePathChange = (event) => {
+    setPath(event.target.value);
   };
 
   const changeGherkin = (event) => {
@@ -620,6 +650,23 @@ const Config = ({
     borderRadius: "3px",
     borderWidth: "border.width",
   });
+
+  const selectStyles = {
+    minWidth: 100,
+    maxWidth: 500,
+    ".MuiInputBase-root": {
+      fontSize: 10,
+      maxHeight: 100,
+    },
+    ".MuiSelect-select": { padding: "2px 20px 2px 5.5px !important" },
+    ".MuiSvgIcon-root": { right: 1 },
+  };
+  const menuItemStyles = {
+    fontSize: 10,
+    maxHeight: 20,
+    minHeight: 20,
+    padding: "2px 20px 2px 5.5px !important",
+  };
 
   return (
     <>
@@ -661,42 +708,74 @@ const Config = ({
           xcss={isGherkinInvalid() && jsonErrorBoxStyles}
         >
           <Stack>
-            <Inline alignBlock="center" alignInline="start">
-              <IconButton
-                icon={(iconProps) => <OneIcon {...iconProps} size="small" />}
-                isDisabled={testIndex === 0}
-                appearance="subtle"
-                spacing="compact"
-                onClick={() => showTextGherkin(0)}
-              ></IconButton>
-              <IconButton
-                icon={(iconProps) => <TwoIcon {...iconProps} size="small" />}
-                isDisabled={testIndex === 1}
-                appearance="subtle"
-                spacing="compact"
-                onClick={() => showTextGherkin(1)}
-              ></IconButton>
-              <IconButton
-                icon={(iconProps) => <ThreeIcon {...iconProps} size="small" />}
-                isDisabled={testIndex === 2}
-                appearance="subtle"
-                spacing="compact"
-                onClick={() => showTextGherkin(2)}
-              ></IconButton>
-              <IconButton
-                icon={(iconProps) => <FourIcon {...iconProps} size="small" />}
-                isDisabled={testIndex === 3}
-                appearance="subtle"
-                spacing="compact"
-                onClick={() => showTextGherkin(3)}
-              ></IconButton>
-              <IconButton
-                icon={(iconProps) => <FiveIcon {...iconProps} size="small" />}
-                isDisabled={testIndex === 4}
-                appearance="subtle"
-                spacing="compact"
-                onClick={() => showTextGherkin(4)}
-              ></IconButton>
+            <Inline alignBlock="center" spread="space-between">
+              <Inline alignBlock="center" alignInline="start">
+                <IconButton
+                  icon={(iconProps) => <OneIcon {...iconProps} size="small" />}
+                  isDisabled={testIndex === 0}
+                  appearance="subtle"
+                  spacing="compact"
+                  onClick={() => showTextGherkin(0)}
+                ></IconButton>
+                <IconButton
+                  icon={(iconProps) => <TwoIcon {...iconProps} size="small" />}
+                  isDisabled={testIndex === 1}
+                  appearance="subtle"
+                  spacing="compact"
+                  onClick={() => showTextGherkin(1)}
+                ></IconButton>
+                <IconButton
+                  icon={(iconProps) => (
+                    <ThreeIcon {...iconProps} size="small" />
+                  )}
+                  isDisabled={testIndex === 2}
+                  appearance="subtle"
+                  spacing="compact"
+                  onClick={() => showTextGherkin(2)}
+                ></IconButton>
+                <IconButton
+                  icon={(iconProps) => <FourIcon {...iconProps} size="small" />}
+                  isDisabled={testIndex === 3}
+                  appearance="subtle"
+                  spacing="compact"
+                  onClick={() => showTextGherkin(3)}
+                ></IconButton>
+                <IconButton
+                  icon={(iconProps) => <FiveIcon {...iconProps} size="small" />}
+                  isDisabled={testIndex === 4}
+                  appearance="subtle"
+                  spacing="compact"
+                  onClick={() => showTextGherkin(4)}
+                ></IconButton>
+              </Inline>
+              {paths && (
+                <Inline alignBlock="center" alignInline="end">
+                  <FormControl sx={selectStyles} size="small">
+                    <Select
+                      onChange={handlePathChange}
+                      MenuProps={{
+                        autoFocus: false,
+                        disableAutoFocusItem: true,
+                        disableEnforceFocus: true,
+                        disableAutoFocus: true,
+                      }}
+                    >
+                      {paths.map((p) => (
+                        <MenuItem value={p} sx={menuItemStyles}>
+                          {p.slice(p.lastIndexOf("/") + 1)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <IconButton
+                    icon={EditorDoneIcon}
+                    isLoading={isGitHubLoading}
+                    appearance="subtle"
+                    spacing="compact"
+                    onClick={getGherkinTextFromGitHubByPath}
+                  ></IconButton>
+                </Inline>
+              )}
             </Inline>
           </Stack>
           <Stack>
