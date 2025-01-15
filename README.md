@@ -8,6 +8,12 @@ Issue panel for Acceptance Test Management.
 
 ## Release Notes
 
+### 0.0.5
+
+- 💄 Add multi-line support for scenario notes
+- ✨ Enable to select feature file from selector on GitHub
+- ⚡️ compress issue property
+
 ### 0.0.4
 
 - ✨ Add ability to add note to individual acceptance test scenarios
