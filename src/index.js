@@ -105,6 +105,26 @@ const sumUpStatuses = (statuses) => {
   return sum;
 };
 
+const deflateJson = (gherkins) => {
+  const zlib = require("node:zlib");
+  return JSON.stringify({
+    v: zlib
+      .deflateRawSync(Buffer.from(JSON.stringify(gherkins)))
+      .toString("base64"),
+  });
+};
+
+const inflateJson = (json) => {
+  const zlib = require("node:zlib");
+  if (json["value"]["v"]) {
+    return JSON.parse(
+      zlib.inflateRawSync(Buffer.from(json["value"]["v"], "base64")).toString()
+    );
+  } else {
+    return json["value"];
+  }
+};
+
 const getIssueProperty = async (projectId, issueId) => {
   if (!issueId) {
     return {};
@@ -121,7 +141,7 @@ const getIssueProperty = async (projectId, issueId) => {
     );
   const gherkins =
     gherkinResponse.status === 200
-      ? (await gherkinResponse.json())["value"]
+      ? inflateJson(await gherkinResponse.json())
       : undefined;
   const statusResponse = await api
     .asUser()
@@ -152,7 +172,7 @@ const getIssueProperty = async (projectId, issueId) => {
 
   const statuses =
     statusResponse.status === 200
-      ? (await statusResponse.json())["value"]
+      ? inflateJson(await statusResponse.json())
       : undefined;
   return {
     gherkins: gherkins ? (Array.isArray(gherkins) ? gherkins : [gherkins]) : [],
@@ -173,7 +193,7 @@ const initIssueProperty = async (gherkins, statuses, issueId) => {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(gherkins),
+        body: deflateJson(gherkins),
       }
     );
   if (response.status !== 200 && response.status !== 201) {
@@ -190,7 +210,7 @@ const initIssueProperty = async (gherkins, statuses, issueId) => {
             Accept: "application/json",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(statuses),
+          body: deflateJson(statuses),
         }
       );
   } catch (e) {}
@@ -226,7 +246,7 @@ const updateIssueProperty = async (statuses, issueId) => {
             Accept: "application/json",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(statuses),
+          body: deflateJson(statuses),
         }
       );
   } catch (e) {}
@@ -355,14 +375,46 @@ const getGherkinTextFromGitHub = async (projectId, issueKey) => {
         },
       }
     );
-    const path = (await fileListResponse.json()).tree.find((x) => {
+    const fileListResponseJson = await fileListResponse.json();
+    const paths = fileListResponseJson.tree
+      .map((x) => x.path)
+      .filter((x) => x.endsWith(".feature"));
+    const path = fileListResponseJson.tree.find((x) => {
       const n = x.path.split("/").pop();
       return (
         n.includes(issueKey) &&
         n.endsWith(".feature") &&
         isNaN(n.at(n.indexOf(issueKey) + issueKey.length))
       );
-    }).path;
+    })?.path;
+    let text = "";
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+        {
+          headers: {
+            Authorization: authorization,
+          },
+        }
+      );
+      text = Buffer.from((await response.json()).content, "base64").toString();
+    } catch (_e) {}
+    return {
+      value: text,
+      paths: paths,
+    };
+  } catch (e) {
+    return {};
+  }
+};
+
+const getGherkinTextFromGitHubByPath = async (projectId, path) => {
+  try {
+    const { ownerForGitHub, repoForGitHub, accessTokenForGitHub } =
+      await getProjectProperty(projectId);
+    const owner = ownerForGitHub;
+    const repo = repoForGitHub;
+    const authorization = `Bearer ${accessTokenForGitHub}`;
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
       {
@@ -442,6 +494,11 @@ resolver.define("getGherkinTextFromBitBucket", async (req) => {
 resolver.define("getGherkinTextFromGitHub", async (req) => {
   const { projectId, issueKey } = req.payload;
   return await getGherkinTextFromGitHub(projectId, issueKey);
+});
+
+resolver.define("getGherkinTextFromGitHubByPath", async (req) => {
+  const { projectId, path } = req.payload;
+  return await getGherkinTextFromGitHubByPath(projectId, path);
 });
 
 export const handler = resolver.getDefinitions();
