@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceptance Test Management for Jira - Documentation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    header {
+      background-color: #333;
+      color: #fff;
+      padding: 10px 0;
+      text-align: center;
+    }
+
+    main {
+      margin: 20px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Acceptance Test Management for Jira: A Comprehensive Guide</h1>
+  </header>
+
+  <main>
+    <h2>Introduction</h2>
+    <p>
+      Welcome to the user guide for Acceptance Test Management for Jira. This app is designed to streamline your
+      acceptance testing process within Jira by allowing you to create, manage, and execute test cases directly from
+      your
+      issues.
+    </p>
+
+    <h2>Installation</h2>
+    <p>
+      Obtain the app from the Atlassian Marketplace: Search for "Acceptance Test Management for Jira" in the
+      Atlassian Marketplace and install it.
+    </p>
+
+    <h2>Usage</h2>
+    <h3>Creating Test Cases</h3>
+    <p>
+      To create a test case, simply open an issue and add Acceptance Test Apps and start writing your test scenarios in
+      Gherkin syntax. For example:
+    </p>
+    <pre>
+Feature: Login functionality
+  Scenario: Successful login
+    Given I am on the login page
+    When I enter "valid_username" as the username
+    And I enter "valid_password" as the password
+    And I click the login button
+    Then I should be redirected to the homepage
+    </pre>
+    <h3>Viewing and Managing Test Results</h3>
+    <p>
+      View the results of your tests directly from the issue. You can easily change the status of a test case to Passed,
+      Failed, Skipped, or Todo.
+    </p>
+    <h3>Searching Test Results</h3>
+    <p>
+      Use JQL to search for specific test results. For example, to find all failed tests, use the query
+      `AcceptanceTestFailed > 0`.
+    </p>
+    <h3>Importing Feature Files</h3>
+    <p>
+      Import your existing feature files from Bitbucket or GitHub directly into Jira. Configuration is needed at project
+      settings page.
+    </p>
+  </main>
+</body>
+
+</html>
